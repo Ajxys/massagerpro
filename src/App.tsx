@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShoppingCart, Star, Shield, Truck, ChevronRight, X, Play, CreditCard, 
   Loader2, CheckCircle2, Lock, Settings, LayoutDashboard, LogOut, Save, 
-  Users, ShoppingBag, TrendingUp, DollarSign, ArrowLeft, Mail, MessageCircle
+  Users, ShoppingBag, TrendingUp, DollarSign, Mail, MessageCircle
 } from 'lucide-react'
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
@@ -40,7 +40,7 @@ function ShopPage() {
   const [isVideoOpen, setIsVideoOpen] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'canceled' | null>(null)
-  const [quantity, setQuantity] = useState(1)
+  const quantity = 1
   const [activeImage, setActiveImage] = useState(0)
   const location = useLocation()
   
