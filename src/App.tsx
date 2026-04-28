@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShoppingCart, Star, Shield, Truck, ChevronRight, X, Play, CreditCard, 
   Loader2, CheckCircle2, Lock, Settings, LayoutDashboard, LogOut, Save, 
-  Users, ShoppingBag, TrendingUp, DollarSign, Mail, MessageCircle
+  Users, ShoppingBag, TrendingUp, DollarSign, Mail, MessageCircle, Youtube
 } from 'lucide-react'
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
@@ -69,8 +69,7 @@ function ShopPage() {
   const handleCheckout = async () => {
     try {
       setIsProcessing(true)
-      
-      // Zapisujemy zamówienie
+
       const newOrder = {
         id: '#' + Math.floor(1000 + Math.random() * 9000),
         name: address.fullName,
@@ -82,30 +81,46 @@ function ShopPage() {
         additionalInfo: address.additionalInfo
       }
       
+      let orderDbId: string | null = null
+
       if (supabase) {
-        // Zapis do Supabase (Baza danych online)
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('orders')
-          .insert([
-            { 
-              order_id: newOrder.id, 
-              name: newOrder.name, 
-              email: newOrder.email, 
-              status: newOrder.status, 
-              total: newOrder.total, 
-              address: newOrder.address, 
-              additional_info: newOrder.additionalInfo 
-            }
-          ])
+          .insert({
+            order_id: newOrder.id,
+            name: newOrder.name,
+            email: newOrder.email,
+            status: newOrder.status,
+            total: newOrder.total,
+            address: newOrder.address,
+            additional_info: newOrder.additionalInfo
+          })
+          .select('id')
+          .single()
         if (error) console.error("Supabase Save Error:", error)
+        if (!error && data?.id) orderDbId = data.id
       } else {
-        // Zapis do localStorage (Tylko lokalnie)
         const existingOrders = JSON.parse(localStorage.getItem('site_orders') || '[]')
         localStorage.setItem('site_orders', JSON.stringify([newOrder, ...existingOrders]))
       }
 
-      const PAYMENT_LINK = "https://buy.stripe.com/00w7sNebc5LB0oC1QF3Nm00" 
-      window.location.href = PAYMENT_LINK
+      if (orderDbId) {
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: orderDbId, email: newOrder.email })
+        })
+
+        if (res.ok) {
+          const payload = await res.json().catch(() => null) as { url?: string } | null
+          if (payload?.url) {
+            window.location.href = payload.url
+            return
+          }
+        }
+      }
+
+      window.location.href = "https://buy.stripe.com/00w7sNebc5LB0oC1QF3Nm00"
     } catch (err) {
       console.error("Checkout Error:", err)
       alert("An unexpected error occurred during checkout.")
@@ -123,10 +138,29 @@ function ShopPage() {
 
       <motion.nav initial={{ y: -100 }} animate={{ y: 0 }} className="fixed top-0 w-full bg-white/70 backdrop-blur-xl z-50 border-b border-slate-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link to="/" className="text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tighter">
-            MASSAGE PRO
+          <Link to="/" className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm ring-1 ring-blue-200/40">
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="4.5" y="8" width="11" height="7" rx="2.5" />
+                <rect x="9" y="14" width="5" height="8" rx="2.5" />
+                <circle cx="19" cy="11.5" r="3.5" />
+                <circle cx="19" cy="11.5" r="1.2" />
+              </svg>
+            </span>
+            <span className="text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tighter">
+              MASSAGE PRO
+            </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
+            <a
+              href="https://www.youtube.com/@massagergunstore"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-slate-500 hover:text-slate-900 font-bold text-[10px] sm:text-sm transition-colors uppercase tracking-widest italic"
+            >
+              <Youtube size={18} className="text-red-600" />
+              <span className="hidden xs:inline">YouTube</span>
+            </a>
             <button 
               onClick={() => setIsContactOpen(true)}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-slate-500 hover:text-slate-900 font-bold text-[10px] sm:text-sm transition-colors uppercase tracking-widest italic"
@@ -134,9 +168,6 @@ function ShopPage() {
               <Mail size={18} />
               <span className="hidden xs:inline">Contact</span>
             </button>
-            <Link to="/admin" className="p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors">
-              <Settings size={20} />
-            </Link>
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="relative p-3 bg-slate-100 rounded-2xl text-slate-600 hover:text-blue-600 transition-colors">
               <ShoppingCart size={24} />
               <motion.span key={quantity} initial={{ scale: 1.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-lg">
@@ -333,22 +364,7 @@ function AdminPage() {
 
       // Fallback do localStorage
       const savedOrders = JSON.parse(localStorage.getItem('site_orders') || '[]')
-      if (savedOrders.length === 0 && !supabase) {
-        setOrders([
-          { 
-            id: '#8842', 
-            name: 'Jan Kowalski (Mock)', 
-            status: 'Opłacone', 
-            total: '29.99$', 
-            date: '2024-04-23 14:20',
-            email: 'jan.kowalski@email.com',
-            address: 'ul. Marszałkowska 10/2, 00-001 Warszawa, Polska',
-            additionalInfo: 'Kod do bramy: 1234'
-          }
-        ])
-      } else {
-        setOrders(savedOrders)
-      }
+      setOrders(savedOrders)
     }
 
     fetchOrders()
@@ -361,6 +377,14 @@ function AdminPage() {
   }
 
   const visits = localStorage.getItem('site_visits') || '0'
+  const visitsNum = Number.parseInt(visits, 10) || 0
+  const paidOrders = orders.filter((o) => o.status === 'Opłacone')
+  const paidCount = paidOrders.length
+  const pendingCount = orders.length - paidCount
+  const revenue = paidOrders
+    .map((o) => Number.parseFloat(String(o.total).replace('$', '')) || 0)
+    .reduce((sum, v) => sum + v, 0)
+  const conversion = visitsNum > 0 ? `${((orders.length / visitsNum) * 100).toFixed(1)}%` : '—'
 
   const clearOrders = () => {
     if (window.confirm('Czy na pewno chcesz wyczyścić listę zamówień? (Tylko lokalnie)')) {
@@ -428,9 +452,9 @@ function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 { label: 'Odwiedziny', value: visits, icon: Users, color: 'blue' },
-                { label: 'Przychód', value: '1,289.57$', icon: DollarSign, color: 'green' },
-                { label: 'Aktywne Zamówienia', value: '12', icon: ShoppingBag, color: 'indigo' },
-                { label: 'Konwersja', value: '4.2%', icon: TrendingUp, color: 'orange' }
+                { label: 'Przychód', value: `${revenue.toFixed(2)}$`, icon: DollarSign, color: 'green' },
+                { label: 'Aktywne Zamówienia', value: String(pendingCount), icon: ShoppingBag, color: 'indigo' },
+                { label: 'Konwersja', value: conversion, icon: TrendingUp, color: 'orange' }
               ].map((stat, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 bg-${stat.color}-50 text-${stat.color}-600`}>
@@ -602,12 +626,81 @@ function VideoModal({ isOpen, onClose, videoSrc }: { isOpen: boolean, onClose: (
   )
 }
 
+function SuccessPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
+
+  useEffect(() => {
+    const sessionId = new URLSearchParams(location.search).get('session_id')
+    if (!sessionId) {
+      setState('error')
+      return
+    }
+
+    fetch(`/api/confirm?session_id=${encodeURIComponent(sessionId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(() => setState('ok'))
+      .catch(() => setState('error'))
+  }, [location.search])
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex items-center justify-center p-6">
+      <div className="w-full max-w-lg bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 text-center">
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${state === 'ok' ? 'bg-green-100 text-green-600' : state === 'loading' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+          {state === 'ok' ? <CheckCircle2 size={48} /> : state === 'loading' ? <Loader2 size={48} className="animate-spin" /> : <X size={48} />}
+        </div>
+        <h1 className="text-3xl font-black uppercase italic tracking-tighter mb-2">
+          {state === 'ok' ? 'Payment Confirmed' : state === 'loading' ? 'Confirming Payment' : 'Confirmation Failed'}
+        </h1>
+        <p className="text-slate-500 mb-8">
+          {state === 'ok'
+            ? "Thanks! Your order is saved and marked as paid in the admin panel."
+            : state === 'loading'
+              ? 'Please wait a moment...'
+              : 'We could not confirm your payment yet. If you paid, try refreshing this page in a minute.'}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button onClick={() => navigate('/')} className="px-8 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase italic tracking-widest">
+            Back to Store
+          </button>
+          {state === 'error' && (
+            <button onClick={() => window.location.reload()} className="px-8 py-4 bg-white text-slate-900 font-black rounded-2xl uppercase italic tracking-widest border border-slate-200">
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CancelPage() {
+  const navigate = useNavigate()
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex items-center justify-center p-6">
+      <div className="w-full max-w-lg bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 text-center">
+        <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+          <X size={48} />
+        </div>
+        <h1 className="text-3xl font-black uppercase italic tracking-tighter mb-2">Payment Canceled</h1>
+        <p className="text-slate-500 mb-8">No worries — you can try again anytime.</p>
+        <button onClick={() => navigate('/')} className="px-8 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase italic tracking-widest">
+          Back to Store
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<ShopPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/success" element={<SuccessPage />} />
+        <Route path="/cancel" element={<CancelPage />} />
       </Routes>
     </Router>
   )
